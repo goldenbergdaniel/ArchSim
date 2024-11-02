@@ -40,7 +40,7 @@ Line :: struct
 
 tokenize_source_code :: proc(src_data: []byte)
 {
-  scratch := mem.begin_temp(mem.scratch())
+  scratch := mem.begin_temp(mem.get_scratch())
   defer mem.end_temp(scratch)
 
   line_start, line_end: int

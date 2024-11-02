@@ -107,7 +107,7 @@ end_temp :: #force_inline proc(temp: Arena_Temp)
 	virtual.arena_temp_end(temp)
 }
 
-scratch :: proc(conflict: ^Arena = nil) -> ^Arena
+get_scratch :: proc(conflict: ^Arena = nil) -> ^Arena
 {
 	result := &scratches[0]
 
@@ -121,12 +121,12 @@ scratch :: proc(conflict: ^Arena = nil) -> ^Arena
 	return result
 }
 
-default_allocator :: #force_inline proc() -> Allocator
+get_default_allocator :: #force_inline proc() -> Allocator
 {
 	return runtime.default_allocator()
 }
 
-panic_allocator :: #force_inline proc() -> Allocator
+get_panic_allocator :: #force_inline proc() -> Allocator
 {
 	return runtime.panic_allocator()
 }

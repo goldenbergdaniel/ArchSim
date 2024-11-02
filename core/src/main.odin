@@ -116,12 +116,11 @@ Operand :: union
 }
 
 opcode_table: map[string]Opcode_Type = make_opcode_table()
-
 sim: Simulator
 
 main :: proc()
 {
-  context.allocator = mem.panic_allocator()
+  context.allocator = mem.get_panic_allocator()
 
   // --- Initialize permenant arena ---------------
   {
@@ -154,7 +153,7 @@ main :: proc()
   sim.lines = make([]Line, MAX_LINES, sim.perm_allocator)
   sim.instructions = make([]^Line, MAX_LINES, sim.perm_allocator)
   sim.memory = make([]byte, MEMORY_SIZE, sim.perm_allocator)
-  sim.symbol_table = make(map[string]Number, 16, mem.default_allocator())
+  sim.symbol_table = make(map[string]Number, 16, mem.get_default_allocator())
   sim.step_to_next = true
 
   // --- Tokenize ---------------
@@ -164,7 +163,7 @@ main :: proc()
 
   // --- Preprocess ---------------
   {
-    scratch := mem.begin_temp(mem.scratch())
+    scratch := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(scratch)
 
     data_offset: int
@@ -272,7 +271,7 @@ main :: proc()
   // --- Execute ---------------
   for sim.program_counter < sim.instruction_count
   {
-    temp := mem.begin_temp(mem.scratch())
+    temp := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(temp)
 
     instruction := sim.instructions[sim.program_counter]
@@ -384,9 +383,9 @@ main :: proc()
       case .XOR:        result = val1 | val2
       case .NOT:        result = ~val1
       case .NEG:        result = -result
-      case .SLL, .SLLI: result = val1 << uint(val2) // NOTE(dg): These may not be right.
-      case .SRL, .SRLI: result = val1 >> uint(val2)
-      case .SRA, .SRAI: result = arithmetic_shift_right(val1, uint(val2))
+      case .SLL, .SLLI: result = Number(u64(val1) << uint(val2))
+      case .SRL, .SRLI: result = Number(u64(val1) >> uint(val2))
+      case .SRA, .SRAI: result = val1 >> uint(val2)
       case .SLT, .SLTI: result = val1 < val2 ? 1 : 0
       case .SLTZ:       result = val1 < 0 ? 1 : 0
       case .SGT, .SGTI: result = val1 > val2 ? 1 : 0
@@ -597,27 +596,6 @@ line_index_from_address :: proc(address: Address) -> int
   return result
 }
 
-arithmetic_shift_right :: proc(number: Number, shift: uint) -> Number
-{
-  number := number
-
-  for _ in 0..<shift
-  {
-    BIT_31 :: 1 << 31
-    if number & transmute(Number) u64(BIT_31) != 0
-    {
-      number >>= 1
-      number |= transmute(Number) u64(BIT_31)
-    }
-    else
-    {
-      number >>= 1
-    }
-  }
-
-  return number
-}
-
 memory_load_bytes :: proc(address: Address, size: uint) -> []byte
 {
   address := cast(uint) address
@@ -669,59 +647,59 @@ bytes_from_value :: proc(value: Number, size: int, arena: ^mem.Arena) -> []byte
 @(private="file")
 make_opcode_table :: proc() -> map[string]Opcode_Type
 {
-  table := make(map[string]Opcode_Type, 64, sim.perm_allocator)
-  table[""] = .NIL
-  table["nop"] = .NOP
-  table["mv" ] = .MV
-  table["li" ] = .LI
-  table["add"] = .ADD
-  table["addi"]= .ADDI
-  table["sub"] = .SUB
-  table["and"] = .AND
-  table["andi"] = .ANDI
-  table["or" ] = .OR
-  table["ori"] = .ORI
-  table["xor"] = .XOR
-  table["xori"] = .XORI
-  table["not"] = .NOT
-  table["neg"] = .NEG
-  table["sll"] = .SLL
-  table["slli"]= .SLLI
-  table["srl"] = .SRL
-  table["srli"]= .SRLI
-  table["sra"] = .SRA
-  table["srai"]= .SRAI
-  table["slt"] = .SLT
-  table["slti"]= .SLTI
-  table["sltz"]= .SLTZ
-  table["sgt"] = .SGT
-  table["sgti"]= .SGTI
-  table["sgtz"]= .SGTZ
-  table["j"] = .J
-  table["jr"] = .JR
-  table["jal"] = .JAL
-  table["jalr"]= .JALR
-  table["ret"] = .RET
-  table["beq"] = .BEQ
-  table["bne"] = .BNE
-  table["blt"] = .BLT
-  table["bgt"] = .BGT
-  table["ble"] = .BLE
-  table["bge"] = .BGE
-  table["beqz"] = .BEQZ
-  table["bnez"] = .BNEZ
-  table["bltz"] = .BLTZ
-  table["bgtz"] = .BGTZ
-  table["blez"] = .BLEZ
-  table["bgez"] = .BGEZ
-  table["lb"] = .LB
-  table["lh"] = .LH
-  table["lw"] = .LW
-  table["sb"] = .SB
-  table["sh"] = .SH
-  table["sw"] = .SW
-  table["lui"] = .LUI
+  table := make(map[string]Opcode_Type, 52, sim.perm_allocator)
+  table[""]      = .NIL
+  table["nop"]   = .NOP
+  table["mv" ]   = .MV
+  table["li" ]   = .LI
+  table["add"]   = .ADD
+  table["addi"]  = .ADDI
+  table["sub"]   = .SUB
+  table["and"]   = .AND
+  table["andi"]  = .ANDI
+  table["or" ]   = .OR
+  table["ori"]   = .ORI
+  table["xor"]   = .XOR
+  table["xori"]  = .XORI
+  table["not"]   = .NOT
+  table["neg"]   = .NEG
+  table["sll"]   = .SLL
+  table["slli"]  = .SLLI
+  table["srl"]   = .SRL
+  table["srli"]  = .SRLI
+  table["sra"]   = .SRA
+  table["srai"]  = .SRAI
+  table["slt"]   = .SLT
+  table["slti"]  = .SLTI
+  table["sltz"]  = .SLTZ
+  table["sgt"]   = .SGT
+  table["sgti"]  = .SGTI
+  table["sgtz"]  = .SGTZ
+  table["j"]     = .J
+  table["jr"]    = .JR
+  table["jal"]   = .JAL
+  table["jalr"]  = .JALR
+  table["ret"]   = .RET
+  table["beq"]   = .BEQ
+  table["bne"]   = .BNE
+  table["blt"]   = .BLT
+  table["bgt"]   = .BGT
+  table["ble"]   = .BLE
+  table["bge"]   = .BGE
+  table["beqz"]  = .BEQZ
+  table["bnez"]  = .BNEZ
+  table["bltz"]  = .BLTZ
+  table["bgtz"]  = .BGTZ
+  table["blez"]  = .BLEZ
+  table["bgez"]  = .BGEZ
+  table["lb"]    = .LB
+  table["lh"]    = .LH
+  table["lw"]    = .LW
+  table["sb"]    = .SB
+  table["sh"]    = .SH
+  table["sw"]    = .SW
+  table["lui"]   = .LUI
   table["auipc"] = .AUIPC
 
-  return {}
+  return table
 }
