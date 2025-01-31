@@ -55,7 +55,7 @@ str_get_number_base :: proc(str: string) -> int
 {
   result: int
 
-       if str_is_bin(str) do result = 2
+  /**/ if str_is_bin(str) do result = 2
   else if str_is_dec(str) do result = 10
   else if str_is_hex(str) do result = 16
 

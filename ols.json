@@ -3,7 +3,7 @@
   "collections": [
     {
       "name": "src",
-      "path": "core/src"
+      "path": "src"
     }
   ],
   "enable_document_symbols": true,
@@ -12,12 +12,12 @@
   "enable_hover": true,
   "enable_snippets": true,
   "verbose": true,
-  "checker_args": "-vet -vet-cast",
+  "checker_args": "-vet-shadowing -vet-cast -vet-style",
   "profile": "main",
   "enable_inlay_hints": true,
   "enable_inlay_hints_default_params": true,
   "profiles":
   [
-    {"name": "main", "checker_path": ["core/src"]}
+    {"name": "main", "checker_path": ["src", "src/json_parser"]}
   ]
 }

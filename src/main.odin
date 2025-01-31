@@ -19,26 +19,24 @@ Number  :: distinct i64
 
 Simulator :: struct
 {
-  should_quit: bool,
-  step_to_next: bool,
-
-  lines: []Line,
-  line_count: int,
-  instructions: []^Line,
-  instruction_count: int,
+  should_quit:          bool,
+  step_to_next:         bool,
+  
+  lines:                []Line,
+  line_count:           int,
+  instructions:         []^Line,
+  instruction_count:    int,
   next_instruction_idx: int,
-  symbol_table: map[string]Number,
+  symbol_table:         map[string]Number,
+  program_counter:      int,
+  registers:            [Register_ID]Number,
+  registers_prev:       [Register_ID]Number,
+  memory:               []byte,
 
-  program_counter: int,
-  registers: [Register_ID]Number,
-  registers_prev: [Register_ID]Number,
-  memory: []byte,
-
-  perm_arena: mem.Arena,
-  perm_allocator: mem.Allocator,
+  perm_arena:           mem.Arena,
 }
 
-Opcode_Type :: enum
+Opcode_Kind :: enum
 {
   NIL,
 
@@ -115,18 +113,15 @@ Operand :: union
   Register_ID,
 }
 
-opcode_table: map[string]Opcode_Type = make_opcode_table()
+opcode_table: map[string]Opcode_Kind = make_opcode_table()
 sim: Simulator
 
 main :: proc()
 {
-  context.allocator = mem.get_panic_allocator()
-
-  // --- Initialize permenant arena ---------------
+  // - Initialize permenant arena ---
   {
     err := mem.init_arena_static(&sim.perm_arena)
     assert(err == nil, "Failed to initialize perm arena!")
-    sim.perm_allocator = mem.to_allocator(&sim.perm_arena)
   }
  
   tui_print_welcome()
@@ -145,29 +140,28 @@ main :: proc()
     return
   }
 
-  src_buf := make([]byte, MAX_SRC_BUF_BYTES, sim.perm_allocator)
+  src_buf := make([]byte, MAX_SRC_BUF_BYTES, mem.allocator(&sim.perm_arena))
   src_size, _ := os.read(src_file, src_buf[:])
   src_data := src_buf[:src_size]
   os.close(src_file)
 
-  sim.lines = make([]Line, MAX_LINES, sim.perm_allocator)
-  sim.instructions = make([]^Line, MAX_LINES, sim.perm_allocator)
-  sim.memory = make([]byte, MEMORY_SIZE, sim.perm_allocator)
+  sim.lines = make([]Line, MAX_LINES, mem.allocator(&sim.perm_arena))
+  sim.instructions = make([]^Line, MAX_LINES, mem.allocator(&sim.perm_arena))
+  sim.memory = make([]byte, MEMORY_SIZE, mem.allocator(&sim.perm_arena))
   sim.symbol_table = make(map[string]Number, 16, mem.get_default_allocator())
   sim.step_to_next = true
 
-  // --- Tokenize ---------------
+  // - Tokenize ---
   tokenize_source_code(src_data)
   // print_tokens()
   // if true do return
 
-  // --- Preprocess ---------------
+  // - Preprocess ---
   {
     scratch := mem.begin_temp(mem.get_scratch())
     defer mem.end_temp(scratch)
 
     data_offset: int
-
     for line_idx := 0; line_idx < sim.line_count; line_idx += 1
     {
       if sim.lines[line_idx].tokens == nil do continue
@@ -258,7 +252,7 @@ main :: proc()
   syntax_ok := syntax_check_lines()
   if !syntax_ok do return
 
-  // --- Instructions from lines ---------------
+  // - Instructions from lines ---
   for &line in sim.lines do if line_is_instruction(line)
   {
     sim.instructions[sim.instruction_count] = &line
@@ -268,7 +262,7 @@ main :: proc()
   semantics_ok := semantics_check_instructions()
   if !semantics_ok do return
 
-  // --- Execute ---------------
+  // - Execute ---
   for sim.program_counter < sim.instruction_count
   {
     temp := mem.begin_temp(mem.get_scratch())
@@ -281,7 +275,7 @@ main :: proc()
       sim.step_to_next = true
     }
 
-    // --- Prompt user command ---------------
+    // - Prompt user command ---
     if sim.step_to_next && sim.program_counter < sim.line_count
     {
       for done: bool; !done;
@@ -294,7 +288,7 @@ main :: proc()
 
     sim.next_instruction_idx = sim.program_counter + 1
 
-    // --- Fetch opcode and operands ----------------
+    // - Fetch opcode and operands ---
     opcode: Token
     operands: [3]Token
     {
@@ -497,7 +491,7 @@ main :: proc()
       }
 
       @(static)
-      sizes := [?]uint{Opcode_Type.LB = 1, Opcode_Type.LH = 2, Opcode_Type.LW = 4}
+      sizes := [?]uint{Opcode_Kind.LB = 1, Opcode_Kind.LH = 2, Opcode_Kind.LW = 4}
       
       type := opcode.opcode_type
       bytes := memory_load_bytes(src_addr, sizes[type])
@@ -518,7 +512,7 @@ main :: proc()
       }
 
       @(static)
-      sizes := [?]int{Opcode_Type.SB = 1, Opcode_Type.SH = 2, Opcode_Type.SW = 4}
+      sizes := [?]int{Opcode_Kind.SB = 1, Opcode_Kind.SH = 2, Opcode_Kind.SW = 4}
       
       type := opcode.opcode_type
       value := sim.registers[src.(Register_ID)]
@@ -546,7 +540,6 @@ instruction_index_from_address :: proc(address: Address) -> int
   result: int = cast(int) address
   result -= BASE_ADDRESS
   result /= INSTRUCTION_SIZE
-
   return result
 }
 
@@ -555,7 +548,6 @@ address_from_instruction_index :: proc(idx: int) -> Address
   result: Address = cast(Address) idx
   result *= INSTRUCTION_SIZE
   result += BASE_ADDRESS
-
   return result
 }
 
@@ -581,7 +573,6 @@ address_from_line_index :: proc(idx: int) -> Address
   }
 
   result += BASE_ADDRESS
-
   return result
 }
 
@@ -592,23 +583,23 @@ line_index_from_address :: proc(address: Address) -> int
   result: int
   instruction_idx := instruction_index_from_address(address)
   result = sim.instructions[instruction_idx].line_idx
-
   return result
 }
 
 memory_load_bytes :: proc(address: Address, size: uint) -> []byte
 {
-  address := cast(uint) address
-  assert(address >= BASE_ADDRESS && address + size <= BASE_ADDRESS + 0xFFFF)
-  address -= BASE_ADDRESS
+  assert(address >= BASE_ADDRESS && address + Address(size) <= BASE_ADDRESS + 0xFFFF)
 
+  address := cast(uint) address
+  address -= BASE_ADDRESS
   return sim.memory[address:address+size]
 }
 
 memory_store_bytes :: proc(address: Address, bytes: []byte)
 {
+  assert(address >= BASE_ADDRESS && address + Address(len(bytes)) <= BASE_ADDRESS + 0xFFFF)
+
   address := cast(int) address
-  assert(address >= BASE_ADDRESS && address + len(bytes) <= BASE_ADDRESS + 0xFFFF)
   address -= BASE_ADDRESS
 
   for i in address..<address+len(bytes)
@@ -634,7 +625,7 @@ value_from_bytes :: proc(bytes: []byte) -> Number
 
 bytes_from_value :: proc(value: Number, size: int, arena: ^mem.Arena) -> []byte
 {
-  result := make([]byte, size, mem.to_allocator(arena))
+  result := make([]byte, size, mem.allocator(arena))
 
   for i in 0..<size
   {
@@ -645,9 +636,9 @@ bytes_from_value :: proc(value: Number, size: int, arena: ^mem.Arena) -> []byte
 }
 
 @(private="file")
-make_opcode_table :: proc() -> map[string]Opcode_Type
+make_opcode_table :: proc() -> map[string]Opcode_Kind
 {
-  table := make(map[string]Opcode_Type, 52, sim.perm_allocator)
+  table := make(map[string]Opcode_Kind, 52, mem.allocator(&sim.perm_arena))
   table[""]      = .NIL
   table["nop"]   = .NOP
   table["mv" ]   = .MV

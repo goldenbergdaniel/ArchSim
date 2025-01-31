@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strings"
 import "core:os"
 
+import "src:basic/mem"
 import "src:term"
 
 TUI_Command :: struct
@@ -14,7 +15,7 @@ TUI_Command :: struct
 
 TUI_Command_Type :: enum
 {
-  NONE,
+  NIL,
 
   QUIT,
   HELP,
@@ -224,7 +225,7 @@ tui_prompt_command :: proc() -> bool
         tui_print_message(.ERROR, "Invalid base. Must be 2, 10, or 16.")
       }
     }
-  case .NONE:
+  case .NIL:
     tui_print_message(.ERROR, "Please enter a valid command.")
     done = false
   }
@@ -232,7 +233,6 @@ tui_prompt_command :: proc() -> bool
   return done
 }
 
-// NOTE(dg): Expects a string without leading whitespace
 tui_command_from_string :: proc(str: string) -> TUI_Command
 {
   result: TUI_Command
@@ -334,7 +334,7 @@ tui_print_sim_result :: proc(instruction: Line, next_idx: int)
 
 tui_print_register_view :: proc(which: bit_set[TUI_Register_Group], base: TUI_Base)
 {
-  // --- Print temporaries ---------------
+  // - Print temporaries ---
   if .TEMPORARIES in which
   {
     fmt.print("[temporaries]\n")
@@ -356,7 +356,7 @@ tui_print_register_view :: proc(which: bit_set[TUI_Register_Group], base: TUI_Ba
     }
   }
 
-  // --- Print saved ---------------
+  // - Print saved ---
   if .SAVED in which
   {
     fmt.print("[saved]\n")
@@ -378,7 +378,7 @@ tui_print_register_view :: proc(which: bit_set[TUI_Register_Group], base: TUI_Ba
     }
   }
 
-  // --- Print arguments ---------------
+  // - Print arguments ---
   if .ARGUMENTS in which
   {
     fmt.print("[arguments]\n")
@@ -400,7 +400,7 @@ tui_print_register_view :: proc(which: bit_set[TUI_Register_Group], base: TUI_Ba
     }
   }
 
-  // --- Print extras ---------------
+  // - Print extras ---
   if .EXTRAS in which
   {
     fmt.print("[extras]\n")
@@ -496,7 +496,7 @@ tui_print_message :: proc(level: TUI_Message_Level, msg: string, args: ..any)
 @(private="file")
 make_command_table :: proc() -> map[string]TUI_Command_Type
 {
-  table := make(map[string]TUI_Command_Type, 16, sim.perm_allocator)
+  table := make(map[string]TUI_Command_Type, 16, mem.allocator(&sim.perm_arena))
   table["q"]        = .QUIT
   table["quit"]     = .QUIT
   table["h"]        = .HELP

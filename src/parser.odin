@@ -8,12 +8,12 @@ import "src:term"
 
 Token :: struct
 {
-  data: string,
-  type: Token_Type,
-  opcode_type: Opcode_Type,
+  data:        string,
+  type:        Token_Type,
+  opcode_type: Opcode_Kind,
   register_id: Register_ID,
-  line: int,
-  column: int,
+  line:        int,
+  column:      int,
 }
 
 Token_Type :: enum
@@ -33,8 +33,8 @@ Token_Type :: enum
 
 Line :: struct
 {
-  tokens: []Token,
-  line_idx: int,
+  tokens:         []Token,
+  line_idx:       int,
   has_breakpoint: bool,
 }
 
@@ -56,7 +56,7 @@ tokenize_source_code :: proc(src_data: []byte)
       else do continue
     }
 
-    // --- Skip lines containing only whitespace ---------------
+    // - Skip lines containing only whitespace ---
     {
       is_whitespace := true
       line_bytes := src_data[line_start:line_end]
@@ -77,9 +77,11 @@ tokenize_source_code :: proc(src_data: []byte)
       }
     }
 
-    sim.lines[line_idx].tokens = make([]Token, MAX_TOKENS_PER_LINE, sim.perm_allocator)
+    sim.lines[line_idx].tokens = make([]Token, 
+                                      MAX_TOKENS_PER_LINE, 
+                                      mem.allocator(&sim.perm_arena))
     
-    // --- Tokenize line ---------------
+    // - Tokenize line ---
     {
       line_bytes := src_data[line_start:line_end]
       line := sim.lines[line_idx]
@@ -147,15 +149,15 @@ tokenize_source_code :: proc(src_data: []byte)
           continue tokenizer_loop
         }
 
-        // --- Tokenize opcode ---------------
+        // - Tokenize opcode ---
         { 
-          tok_str_lower := strings.to_lower(tok_str, mem.to_allocator(scratch.arena))
+          tok_str_lower := strings.to_lower(tok_str, mem.allocator(scratch.arena))
           op_type := opcode_table[tok_str_lower]
           if op_type != .NIL
           {
             line.tokens[token_cnt] = Token{
               data=tok_str, 
-              type=.OPCODE
+              type=.OPCODE,
             }
 
             line.tokens[token_cnt].opcode_type = op_type
@@ -164,45 +166,45 @@ tokenize_source_code :: proc(src_data: []byte)
           }
         }
 
-        // --- Tokenize number ----------------
+        // - Tokenize number ---
         if str_is_bin(tok_str) || str_is_dec(tok_str) || str_is_hex(tok_str)
         {
           line.tokens[token_cnt] = Token{
             data=tok_str, 
-            type=.NUMBER
+            type=.NUMBER,
           }
 
           token_cnt += 1
           continue tokenizer_loop
         }
 
-        // --- Tokenize character ---------------
+        // - Tokenize character -
         if tok_str[0] == '\''
         {
           chr := tok_str[1:len(tok_str)-1]
           line.tokens[token_cnt] = Token{
             data=chr, 
-            type=.CHARACTER
+            type=.CHARACTER,
           }
 
           token_cnt += 1
           continue tokenizer_loop
         }
 
-        // --- Tokenize string ---------------
+        // - Tokenize string ---
         if tok_str[0] == '\"'
         {
           str := tok_str[1:len(tok_str)-1]
           line.tokens[token_cnt] = Token{
             data=str, 
-            type=.STRING
+            type=.STRING,
           }
 
           token_cnt += 1
           continue tokenizer_loop
         }
 
-        // --- Tokenize operator ---------------
+        // - Tokenize operator ---
         {
           @(static)
           operators := [?]Token_Type{':' = .COLON, '=' = .EQUALS}
@@ -211,7 +213,7 @@ tokenize_source_code :: proc(src_data: []byte)
           {
             line.tokens[token_cnt] = Token{
               data=tok_str, 
-              type=operators[tok_str[0]]
+              type=operators[tok_str[0]],
             }
 
             token_cnt += 1
@@ -219,19 +221,19 @@ tokenize_source_code :: proc(src_data: []byte)
           }
         }
 
-        // --- Tokenize directive ---------------
+        // - Tokenize directive ---
         if tok_str[0] == '.'
         {
           line.tokens[token_cnt] = Token{
             data=tok_str, 
-            type=.DIRECTIVE
+            type=.DIRECTIVE,
           }
 
           token_cnt += 1
           continue tokenizer_loop
         }
 
-        // --- Tokenize register ---------------
+        // - Tokenize register ---
         {
           register_id, ok := register_from_string(tok_str)
           if ok
@@ -239,7 +241,7 @@ tokenize_source_code :: proc(src_data: []byte)
             line.tokens[token_cnt] = Token{
               data = tok_str, 
               type = .REGISTER, 
-              register_id = register_id
+              register_id = register_id,
             }
             
             token_cnt += 1
@@ -247,11 +249,11 @@ tokenize_source_code :: proc(src_data: []byte)
           }
         }
 
-        // --- Tokenize label ---------------
+        // - Tokenize label ---
         {
           line.tokens[token_cnt] = Token{
             data=tok_str, 
-            type=.LABEL
+            type=.LABEL,
           }
 
           token_cnt += 1
@@ -287,7 +289,7 @@ syntax_check_lines :: proc() -> bool
     {
       error = Syntax_Error{
         type = .MISSING_COLON,
-        line = line.tokens[0].line
+        line = line.tokens[0].line,
       }
     }
 
@@ -306,7 +308,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
     instruction := sim.instructions[instruction_idx]
     error: Parser_Error
 
-    // --- Fetch opcode and operands ---------------
+    // - Fetch opcode and operands ---
     opcode: Token
     operands: [3]Token
     operand_cnt: int
@@ -362,8 +364,8 @@ semantics_check_instructions :: proc() -> (ok: bool)
 
           break
         }
-      case .MV:
-      case .SLTZ:
+      case .MV:   fallthrough
+      case .SLTZ: fallthrough
       case .SGTZ:
         if operand_cnt != 2
         {
@@ -381,7 +383,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -391,7 +393,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -415,7 +417,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -425,7 +427,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -456,7 +458,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -466,7 +468,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -476,7 +478,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[2].type
+            actual_type = operands[2].type,
           }
 
           break
@@ -499,7 +501,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -529,7 +531,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -539,7 +541,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -549,7 +551,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[2].type
+            actual_type = operands[2].type,
           }
 
           break
@@ -573,7 +575,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -597,14 +599,14 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
         }
       case .BEQ: fallthrough
-      case. BNE: fallthrough
-      case. BLT: fallthrough
+      case .BNE: fallthrough
+      case .BLT: fallthrough
       case .BGT: fallthrough
       case .BLE: fallthrough
       case .BGE:
@@ -624,7 +626,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -634,7 +636,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -646,7 +648,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[2].type
+            actual_type = operands[2].type,
           }
 
           break
@@ -673,7 +675,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -685,7 +687,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -712,7 +714,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[0].type
+            actual_type = operands[0].type,
           }
 
           break
@@ -722,7 +724,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .REGISTER,
-            actual_type = operands[1].type
+            actual_type = operands[1].type,
           }
 
           break
@@ -735,7 +737,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
         {
           error = Type_Error{
             expected_type = .NUMBER,
-            actual_type = operands[2].type
+            actual_type = operands[2].type,
           }
 
           break
@@ -886,7 +888,7 @@ line_is_instruction :: proc(line: Line) -> bool
          (line.tokens[0].type == .LABEL && line.tokens[2].type == .OPCODE))
 }
 
-// @ParserError /////////////////////////////////////////////////////////////////////
+// ParserError ///////////////////////////////////////////////////////////////////////////
 
 Parser_Error :: union
 {
@@ -897,11 +899,10 @@ Parser_Error :: union
 
 Syntax_Error :: struct
 {
-  line: int,
+  line:   int,
   column: int,
-  token: Token,
-
-  type: Syntax_Error_Type,
+  token:  Token,
+  type:   Syntax_Error_Type,
 }
 
 Syntax_Error_Type :: enum
@@ -914,23 +915,21 @@ Syntax_Error_Type :: enum
 
 Type_Error :: struct
 {
-  line: int,
-  column: int,
-  token: Token,
-
+  line:          int,
+  column:        int,
+  token:         Token,
   expected_type: Token_Type,
-  actual_type: Token_Type,
+  actual_type:   Token_Type,
 }
 
 Opcode_Error :: struct
 {
-  line: int,
-  column: int,
-  token: Token,
-
-  type: Opcode_Error_Type,
+  line:                 int,
+  column:               int,
+  token:                Token,
+  type:                 Opcode_Error_Type,
   expected_operand_cnt: int,
-  actual_operand_cnt: int,
+  actual_operand_cnt:   int,
 }
 
 Opcode_Error_Type :: enum
