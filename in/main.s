@@ -1,10 +1,10 @@
 .equ ADDRESS 0x10000FF0
 
 .section .data
-.byte BYTE 0xAA, 'B', 14
-.short SHORT 0xBBBB
-.word WORD 0xCCCCCCCC
-.long LONG 0xDDDDDDDDDDDDDDDD
+.byte  BYTE   0xAA, 'B', 14
+.short SHORT  0xBBBB
+.word  WORD   0xCCCCCCCC
+.long  LONG   0xDDDDDDDDDDDDDDDD
 .ascii STRING "hellope!"
 
 .section .text

@@ -9,11 +9,11 @@ import "src:term"
 
 TUI_Command :: struct
 {
-  type: TUI_Command_Type,
+  type: TUI_Command_Kind,
   args: [3]string,
 }
 
-TUI_Command_Type :: enum
+TUI_Command_Kind :: enum
 {
   NIL,
 
@@ -46,7 +46,7 @@ TUI_Config :: struct
 }
 
 @(private="file")
-command_table: map[string]TUI_Command_Type = make_command_table()
+command_table: map[string]TUI_Command_Kind = make_command_table()
 
 @(private="file")
 global_config: TUI_Config = { base=.HEX }
@@ -494,9 +494,9 @@ tui_print_message :: proc(level: TUI_Message_Level, msg: string, args: ..any)
 }
 
 @(private="file")
-make_command_table :: proc() -> map[string]TUI_Command_Type
+make_command_table :: proc() -> map[string]TUI_Command_Kind
 {
-  table := make(map[string]TUI_Command_Type, 16, mem.allocator(&sim.perm_arena))
+  table := make(map[string]TUI_Command_Kind, 16, mem.a(&sim.perm_arena))
   table["q"]        = .QUIT
   table["quit"]     = .QUIT
   table["h"]        = .HELP

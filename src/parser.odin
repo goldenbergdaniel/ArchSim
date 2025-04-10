@@ -38,10 +38,11 @@ Line :: struct
   has_breakpoint: bool,
 }
 
+opcode_table: map[string]Opcode_Kind = make_opcode_table()
+
 tokenize_source_code :: proc(src_data: []byte)
 {
-  scratch := mem.begin_temp(mem.get_scratch())
-  defer mem.end_temp(scratch)
+  scratch := mem.scope_scratch()
 
   line_start, line_end: int
   for line_idx := 0; line_end < len(src_data); line_idx += 1
@@ -60,7 +61,6 @@ tokenize_source_code :: proc(src_data: []byte)
     {
       is_whitespace := true
       line_bytes := src_data[line_start:line_end]
-
       for b in line_bytes
       {
         if b != ' ' && b != '\n' && b != '\r' && b != '\t'
@@ -79,7 +79,7 @@ tokenize_source_code :: proc(src_data: []byte)
 
     sim.lines[line_idx].tokens = make([]Token, 
                                       MAX_TOKENS_PER_LINE, 
-                                      mem.allocator(&sim.perm_arena))
+                                      mem.a(&sim.perm_arena))
     
     // - Tokenize line ---
     {
@@ -151,7 +151,7 @@ tokenize_source_code :: proc(src_data: []byte)
 
         // - Tokenize opcode ---
         { 
-          tok_str_lower := strings.to_lower(tok_str, mem.allocator(scratch.arena))
+          tok_str_lower := strings.to_lower(tok_str, mem.a(scratch.arena))
           op_type := opcode_table[tok_str_lower]
           if op_type != .NIL
           {
@@ -346,7 +346,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
       }
     }
 
-    for error == nil
+    error_check_loop: for error == nil
     {
       switch opcode.opcode_type
       {
@@ -362,7 +362,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
       case .MV:   fallthrough
       case .SLTZ: fallthrough
@@ -376,7 +376,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -396,7 +396,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
       case .LI:  fallthrough
       case .LUI: fallthrough
@@ -420,7 +420,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .NUMBER && operands[1].type != .CHARACTER
@@ -430,7 +430,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
       case .ADD: fallthrough
       case .SUB: fallthrough
@@ -461,7 +461,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .REGISTER
@@ -471,7 +471,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[2].type != .REGISTER
@@ -481,7 +481,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[2].type,
           }
 
-          break
+          break error_check_loop
         }
       case .NOT: fallthrough
       case .NEG:
@@ -494,7 +494,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -504,7 +504,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
       case .ADDI: fallthrough
       case .ANDI: fallthrough
@@ -524,7 +524,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -534,7 +534,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .REGISTER
@@ -554,7 +554,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[2].type,
           }
 
-          break
+          break error_check_loop
         }
       case .J:  fallthrough
       case .JAL:
@@ -567,7 +567,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .LABEL && (operands[0].type != .NUMBER && 
@@ -578,7 +578,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
       case .JR: fallthrough
@@ -592,7 +592,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -602,7 +602,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
       case .BEQ: fallthrough
       case .BNE: fallthrough
@@ -619,7 +619,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -629,7 +629,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .REGISTER
@@ -639,7 +639,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[2].type != .NUMBER &&
@@ -651,7 +651,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[2].type,
           }
 
-          break
+          break error_check_loop
         }
       case .BEQZ: fallthrough
       case .BNEZ: fallthrough
@@ -668,7 +668,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -678,7 +678,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .NUMBER && 
@@ -690,7 +690,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
       case .LB: fallthrough
       case .LH: fallthrough
@@ -707,7 +707,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_operand_cnt = operand_cnt,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[0].type != .REGISTER
@@ -717,7 +717,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[0].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[1].type != .REGISTER && operands[1].type != .LABEL
@@ -727,7 +727,7 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[1].type,
           }
 
-          break
+          break error_check_loop
         }
 
         if operands[2].type != .NIL && 
@@ -740,11 +740,11 @@ semantics_check_instructions :: proc() -> (ok: bool)
             actual_type = operands[2].type,
           }
 
-          break
+          break error_check_loop
         }
       }
 
-      if error == nil do break
+      if error == nil do break error_check_loop
     }
 
     if resolve_parser_error(error, instruction.line_idx)
@@ -976,4 +976,64 @@ resolve_parser_error :: proc(error: Parser_Error, line_idx: int) -> bool
   term.color(.WHITE)
 
   return true
+}
+
+@(private="file")
+make_opcode_table :: proc() -> map[string]Opcode_Kind
+{
+  table := make(map[string]Opcode_Kind, 52, mem.a(&sim.perm_arena))
+  table[""]      = .NIL
+  table["nop"]   = .NOP
+  table["mv" ]   = .MV
+  table["li" ]   = .LI
+  table["add"]   = .ADD
+  table["addi"]  = .ADDI
+  table["sub"]   = .SUB
+  table["and"]   = .AND
+  table["andi"]  = .ANDI
+  table["or" ]   = .OR
+  table["ori"]   = .ORI
+  table["xor"]   = .XOR
+  table["xori"]  = .XORI
+  table["not"]   = .NOT
+  table["neg"]   = .NEG
+  table["sll"]   = .SLL
+  table["slli"]  = .SLLI
+  table["srl"]   = .SRL
+  table["srli"]  = .SRLI
+  table["sra"]   = .SRA
+  table["srai"]  = .SRAI
+  table["slt"]   = .SLT
+  table["slti"]  = .SLTI
+  table["sltz"]  = .SLTZ
+  table["sgt"]   = .SGT
+  table["sgti"]  = .SGTI
+  table["sgtz"]  = .SGTZ
+  table["j"]     = .J
+  table["jr"]    = .JR
+  table["jal"]   = .JAL
+  table["jalr"]  = .JALR
+  table["ret"]   = .RET
+  table["beq"]   = .BEQ
+  table["bne"]   = .BNE
+  table["blt"]   = .BLT
+  table["bgt"]   = .BGT
+  table["ble"]   = .BLE
+  table["bge"]   = .BGE
+  table["beqz"]  = .BEQZ
+  table["bnez"]  = .BNEZ
+  table["bltz"]  = .BLTZ
+  table["bgtz"]  = .BGTZ
+  table["blez"]  = .BLEZ
+  table["bgez"]  = .BGEZ
+  table["lb"]    = .LB
+  table["lh"]    = .LH
+  table["lw"]    = .LW
+  table["sb"]    = .SB
+  table["sh"]    = .SH
+  table["sw"]    = .SW
+  table["lui"]   = .LUI
+  table["auipc"] = .AUIPC
+
+  return table
 }

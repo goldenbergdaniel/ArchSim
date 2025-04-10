@@ -113,7 +113,6 @@ Operand :: union
   Register_ID,
 }
 
-opcode_table: map[string]Opcode_Kind = make_opcode_table()
 sim: Simulator
 
 main :: proc()
@@ -123,10 +122,10 @@ main :: proc()
     err := mem.init_arena_static(&sim.perm_arena)
     assert(err == nil, "Failed to initialize perm arena!")
   }
- 
+
   tui_print_welcome()
 
-  src_file_path := "asm/main.s"
+  src_file_path := "in/main.s"
   if len(os.args) > 1
   {
     src_file_path = os.args[1]
@@ -140,14 +139,14 @@ main :: proc()
     return
   }
 
-  src_buf := make([]byte, MAX_SRC_BUF_BYTES, mem.allocator(&sim.perm_arena))
+  src_buf := make([]byte, MAX_SRC_BUF_BYTES, mem.a(&sim.perm_arena))
   src_size, _ := os.read(src_file, src_buf[:])
   src_data := src_buf[:src_size]
   os.close(src_file)
 
-  sim.lines = make([]Line, MAX_LINES, mem.allocator(&sim.perm_arena))
-  sim.instructions = make([]^Line, MAX_LINES, mem.allocator(&sim.perm_arena))
-  sim.memory = make([]byte, MEMORY_SIZE, mem.allocator(&sim.perm_arena))
+  sim.lines = make([]Line, MAX_LINES, mem.a(&sim.perm_arena))
+  sim.instructions = make([]^Line, MAX_LINES, mem.a(&sim.perm_arena))
+  sim.memory = make([]byte, MEMORY_SIZE, mem.a(&sim.perm_arena))
   sim.symbol_table = make(map[string]Number, 16, mem.get_default_allocator())
   sim.step_to_next = true
 
@@ -158,8 +157,7 @@ main :: proc()
 
   // - Preprocess ---
   {
-    scratch := mem.begin_temp(mem.get_scratch())
-    defer mem.end_temp(scratch)
+    scratch := mem.scope_scratch()
 
     data_offset: int
     for line_idx := 0; line_idx < sim.line_count; line_idx += 1
@@ -377,8 +375,8 @@ main :: proc()
       case .XOR:        result = val1 | val2
       case .NOT:        result = ~val1
       case .NEG:        result = -result
-      case .SLL, .SLLI: result = Number(u64(val1) << uint(val2))
-      case .SRL, .SRLI: result = Number(u64(val1) >> uint(val2))
+      case .SLL, .SLLI: result = Number(val1 << uint(val2))
+      case .SRL, .SRLI: result = Number(val1 >> uint(val2))
       case .SRA, .SRAI: result = val1 >> uint(val2)
       case .SLT, .SLTI: result = val1 < val2 ? 1 : 0
       case .SLTZ:       result = val1 < 0 ? 1 : 0
@@ -625,7 +623,7 @@ value_from_bytes :: proc(bytes: []byte) -> Number
 
 bytes_from_value :: proc(value: Number, size: int, arena: ^mem.Arena) -> []byte
 {
-  result := make([]byte, size, mem.allocator(arena))
+  result := make([]byte, size, mem.a(arena))
 
   for i in 0..<size
   {
@@ -633,64 +631,4 @@ bytes_from_value :: proc(value: Number, size: int, arena: ^mem.Arena) -> []byte
   }
 
   return result
-}
-
-@(private="file")
-make_opcode_table :: proc() -> map[string]Opcode_Kind
-{
-  table := make(map[string]Opcode_Kind, 52, mem.allocator(&sim.perm_arena))
-  table[""]      = .NIL
-  table["nop"]   = .NOP
-  table["mv" ]   = .MV
-  table["li" ]   = .LI
-  table["add"]   = .ADD
-  table["addi"]  = .ADDI
-  table["sub"]   = .SUB
-  table["and"]   = .AND
-  table["andi"]  = .ANDI
-  table["or" ]   = .OR
-  table["ori"]   = .ORI
-  table["xor"]   = .XOR
-  table["xori"]  = .XORI
-  table["not"]   = .NOT
-  table["neg"]   = .NEG
-  table["sll"]   = .SLL
-  table["slli"]  = .SLLI
-  table["srl"]   = .SRL
-  table["srli"]  = .SRLI
-  table["sra"]   = .SRA
-  table["srai"]  = .SRAI
-  table["slt"]   = .SLT
-  table["slti"]  = .SLTI
-  table["sltz"]  = .SLTZ
-  table["sgt"]   = .SGT
-  table["sgti"]  = .SGTI
-  table["sgtz"]  = .SGTZ
-  table["j"]     = .J
-  table["jr"]    = .JR
-  table["jal"]   = .JAL
-  table["jalr"]  = .JALR
-  table["ret"]   = .RET
-  table["beq"]   = .BEQ
-  table["bne"]   = .BNE
-  table["blt"]   = .BLT
-  table["bgt"]   = .BGT
-  table["ble"]   = .BLE
-  table["bge"]   = .BGE
-  table["beqz"]  = .BEQZ
-  table["bnez"]  = .BNEZ
-  table["bltz"]  = .BLTZ
-  table["bgtz"]  = .BGTZ
-  table["blez"]  = .BLEZ
-  table["bgez"]  = .BGEZ
-  table["lb"]    = .LB
-  table["lh"]    = .LH
-  table["lw"]    = .LW
-  table["sb"]    = .SB
-  table["sh"]    = .SH
-  table["sw"]    = .SW
-  table["lui"]   = .LUI
-  table["auipc"] = .AUIPC
-
-  return table
 }

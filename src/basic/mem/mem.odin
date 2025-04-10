@@ -15,13 +15,13 @@ MIB :: 1 << 20
 GIB :: 1 << 30
 
 @(thread_local, private)
-global_scratches: [2]Arena
+scratches: [2]Arena
 
 @(init)
-init_scratches :: proc()
+init_scratches_on_thread :: proc()
 {
-	init_arena_growing(&global_scratches[0])
-	init_arena_growing(&global_scratches[1])
+	init_arena_growing(&scratches[0])
+	init_arena_growing(&scratches[1])
 }
 
 copy :: #force_inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr
@@ -46,7 +46,7 @@ to_bytes :: #force_inline proc "contextless" (val: any) -> []byte
 	return mem.any_to_bytes(val)
 }
 
-allocator :: #force_inline proc "contextless" (arena: ^Arena) -> Allocator
+a :: #force_inline proc "contextless" (arena: ^Arena) -> Allocator
 {
 	return Allocator{
 		procedure = virtual.arena_allocator_proc,
@@ -78,7 +78,7 @@ init_arena_static :: proc(
 
 clear_arena :: #force_inline proc(arena: ^Arena)
 {
-	free_all(allocator(arena))
+	free_all(a(arena))
 }
 
 destroy_arena :: #force_inline proc(arena: ^Arena)
@@ -86,37 +86,45 @@ destroy_arena :: #force_inline proc(arena: ^Arena)
 	virtual.arena_destroy(arena)
 }
 
+begin_scratch :: #force_inline proc(conflict: ^Arena = nil) -> Arena_Temp
+{
+	return virtual.arena_temp_begin(get_scratch(conflict))
+}
+
+@(deferred_out=end_scratch)
+scope_scratch :: #force_inline proc(conflict: ^Arena = nil) -> Arena_Temp
+{
+	return begin_scratch(get_scratch(conflict))
+}
+
+end_scratch :: #force_inline proc(temp: Arena_Temp)
+{
+	virtual.arena_temp_end(temp)
+}
+
 begin_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
 {
 	return virtual.arena_temp_begin(arena)
 }
 
-@(deferred_out=end_temp)
-scope_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
-{
-	return begin_temp(arena)
-}
+// @(deferred_out=end_temp)
+// scope_temp :: #force_inline proc(arena: ^Arena) -> Arena_Temp
+// {
+// 	return begin_temp(arena)
+// }
 
 end_temp :: #force_inline proc(temp: Arena_Temp)
 {
 	virtual.arena_temp_end(temp)
 }
 
-get_scratch :: proc(conflict: ^Arena = nil) -> ^Arena
+get_scratch :: #force_inline proc(conflict: ^Arena = nil) -> ^Arena
 {
-	result := &global_scratches[0]
-
-	if conflict == nil do return result
-
-	if cast(uintptr) result.curr_block.base == cast(uintptr) conflict.curr_block.base
-	{
-		result = &global_scratches[1]
-	}
-
-	return result
+	collision := conflict != nil && scratches[0].curr_block.base == conflict.curr_block.base
+	return collision ? &scratches[1] : &scratches[0]
 }
 
-get_default_allocator :: proc() -> Allocator
+get_default_allocator :: #force_inline proc() -> Allocator
 {
 	return runtime.default_allocator()
 }
