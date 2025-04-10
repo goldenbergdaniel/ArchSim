@@ -3,8 +3,8 @@ package main
 import "core:fmt"
 import "core:strings"
 
-import "src:basic/mem"
-import "src:term"
+import "basic/mem"
+import "term"
 
 Token :: struct
 {
@@ -19,7 +19,6 @@ Token :: struct
 Token_Type :: enum
 {
   NIL,
-
   OPCODE,
   REGISTER,
   LABEL,
@@ -54,7 +53,7 @@ tokenize_source_code :: proc(src_data: []byte)
       end_of_file := line_end == len(src_data) - 1
 
       if end_of_file do break
-      else do continue
+      else           do continue
     }
 
     // - Skip lines containing only whitespace ---
@@ -77,9 +76,7 @@ tokenize_source_code :: proc(src_data: []byte)
       }
     }
 
-    sim.lines[line_idx].tokens = make([]Token, 
-                                      MAX_TOKENS_PER_LINE, 
-                                      mem.a(&sim.perm_arena))
+    sim.lines[line_idx].tokens = make([]Token, MAX_TOKENS_PER_LINE, mem.a(&sim.perm_arena))
     
     // - Tokenize line ---
     {

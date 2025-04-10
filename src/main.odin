@@ -3,8 +3,8 @@ package main
 import "core:fmt"
 import "core:os"
 
-import "src:basic/mem"
-import "src:term"
+import "basic/mem"
+import "term"
 
 MAX_SRC_BUF_BYTES   :: 2048
 MAX_LINES           :: 64
@@ -152,8 +152,6 @@ main :: proc()
 
   // - Tokenize ---
   tokenize_source_code(src_data)
-  // print_tokens()
-  // if true do return
 
   // - Preprocess ---
   {

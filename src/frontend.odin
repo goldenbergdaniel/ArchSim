@@ -4,8 +4,8 @@ import "core:fmt"
 import "core:strings"
 import "core:os"
 
-import "src:basic/mem"
-import "src:term"
+import "basic/mem"
+import "term"
 
 TUI_Command :: struct
 {

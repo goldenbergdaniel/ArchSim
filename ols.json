@@ -1,11 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/ols.schema.json",
-  "collections": [
-    {
-      "name": "src",
-      "path": "src"
-    }
-  ],
   "enable_document_symbols": true,
   "enable_semantic_tokens": true,
   "enable_format": false,
@@ -18,6 +12,6 @@
   "enable_inlay_hints_default_params": true,
   "profiles":
   [
-    {"name": "main", "checker_path": ["src", "src/json_parser"]}
+    {"name": "main", "checker_path": ["src"]}
   ]
 }
